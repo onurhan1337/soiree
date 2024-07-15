@@ -41,7 +41,7 @@ model Event {
 
 model EventAttendee {
   id        String   @id @default(cuid())
-  role      String
+  role      ATTENDEE_ROLE @default(ATTENDEE)
   event     Event    @relation("EventToAttendees", fields: [eventId], references: [id])
   eventId   String
   user      User     @relation("UserToAttendees", fields: [userId], references: [id])
@@ -50,4 +50,10 @@ model EventAttendee {
   updatedAt DateTime @updatedAt
 
   @@unique([eventId, userId])
+}
+
+enum ATTENDEE_ROLE {
+  ORGANIZER
+  ATTENDEE
+  SPEAKER
 }
