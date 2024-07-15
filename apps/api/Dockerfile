@@ -24,13 +24,20 @@ COPY --from=builder /app/out/json/ .
 COPY --from=builder /app/out/pnpm-lock.yaml ./pnpm-lock.yaml
 RUN pnpm install
 
+COPY . . 
+
+RUN pnpm install -g prisma @prisma/client
+RUN npx prisma generate --schema ./apps/api/prisma/schema.prisma
+
 # Build the project
 COPY --from=builder /app/out/full/ .
 COPY turbo.json turbo.json
 
-# Uncomment and use build args to enable remote caching
-# ARG TURBO_TEAM
-# ENV TURBO_TEAM=$TURBO_TEAM
+ARG DATABASE_URL
+ENV DATABASE_URL=$DATABASE_URL
+
+ARG JWT_SECRET  
+ENV JWT_SECRET=$JWT_SECRET
 
 # ARG TURBO_TOKEN
 # ENV TURBO_TOKEN=$TURBO_TOKEN
