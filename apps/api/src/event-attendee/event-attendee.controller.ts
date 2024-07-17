@@ -2,18 +2,18 @@ import {
   Body,
   Controller,
   Delete,
+  Get,
   Param,
   Post,
   Put,
+  Query,
   Req,
+  UnauthorizedException,
   UseGuards,
 } from '@nestjs/common';
 import { Request } from 'express';
 import { AuthGuard } from '../guards/auth/auth.guard';
-import {
-  CreateAttendeeDto,
-  CreateAttendeeRoleDto,
-} from './dto/create-attendee.dto';
+import { CreateAttendeeRoleDto } from './dto/create-attendee.dto';
 import { EventAttendeeService } from './event-attendee.service';
 
 @Controller('event-attendee')
@@ -21,14 +21,18 @@ import { EventAttendeeService } from './event-attendee.service';
 export class EventAttendeeController {
   constructor(private readonly eventAttendeeService: EventAttendeeService) {}
 
+  @Get()
+  async getAttendees(@Query('eventId') eventId: string) {
+    return this.eventAttendeeService.findAttendees(eventId);
+  }
+
   @Post()
-  createAttendee(
+  async createAttendee(
     @Req() req: Request,
     @Body()
     newAttendee: {
       eventId: string;
       userId: string;
-      role: CreateAttendeeDto;
     },
   ) {
     if (req.user.sub !== newAttendee.userId) {
@@ -38,7 +42,6 @@ export class EventAttendeeController {
     return this.eventAttendeeService.createAttendee(
       newAttendee.eventId,
       newAttendee.userId,
-      newAttendee.role,
     );
   }
 
@@ -68,24 +71,19 @@ export class EventAttendeeController {
     );
   }
 
-  // TODO: change params with the @Query decorator
-  @Delete(':eventId/:userId')
+  @Delete()
   async removeAttendee(
     @Req() req: Request,
-    @Param('eventId') eventId: string,
-    @Param('userId') userId: string,
+    @Query('eventId') eventId: string,
+    @Query('userId') userId: string,
   ) {
-    if (req.user.sub !== userId) {
-      throw new Error('Unauthorized');
-    }
-
-    const existingAttendee = await this.eventAttendeeService.findAttendee(
+    const attendee = await this.eventAttendeeService.findAttendee(
       eventId,
-      userId,
+      req.user.sub,
     );
 
-    if (existingAttendee.role === 'ORGANIZER') {
-      throw new Error('Only organizers can remove attendees');
+    if (attendee.role !== 'ORGANIZER' && req.user.sub !== userId) {
+      throw new UnauthorizedException('Unauthorized');
     }
 
     return this.eventAttendeeService.removeAttendee(eventId, userId);
