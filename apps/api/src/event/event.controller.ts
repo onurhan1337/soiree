@@ -7,6 +7,7 @@ import {
   Post,
   Put,
   Req,
+  UnauthorizedException,
   UseGuards,
 } from '@nestjs/common';
 import { Prisma } from '@prisma/client';
@@ -32,7 +33,7 @@ export class EventController {
   @Post()
   createEvent(@Req() req: Request, @Body() newEvent: Prisma.EventCreateInput) {
     if (req.user.sub !== newEvent.organizer.connect.id) {
-      throw new Error('Unauthorized');
+      throw new UnauthorizedException('Unauthorized');
     }
     return this.eventService.createEvent(newEvent);
   }
