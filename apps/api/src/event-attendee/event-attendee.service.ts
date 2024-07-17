@@ -1,19 +1,31 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
-import { PrismaService } from '../prisma/prisma.service';
 import {
-  CreateAttendeeDto,
-  CreateAttendeeRoleDto,
-} from './dto/create-attendee.dto';
+  ConflictException,
+  ForbiddenException,
+  Injectable,
+  NotFoundException,
+} from '@nestjs/common';
+import { PrismaService } from '../prisma/prisma.service';
+import { CreateAttendeeRoleDto } from './dto/create-attendee.dto';
 
 @Injectable()
 export class EventAttendeeService {
   constructor(private readonly prisma: PrismaService) {}
 
-  async createAttendee(
-    eventId: string,
-    userId: string,
-    role: CreateAttendeeDto,
-  ) {
+  async findAttendees(eventId: string) {
+    const attendees = await this.prisma.eventAttendee.findMany({
+      where: {
+        eventId,
+      },
+    });
+
+    if (!attendees) {
+      throw new NotFoundException('Attendees not found');
+    }
+
+    return attendees;
+  }
+
+  async createAttendee(eventId: string, userId: string) {
     const event = await this.prisma.event.findUnique({
       where: {
         id: eventId,
@@ -36,15 +48,15 @@ export class EventAttendeeService {
 
     const existingAttendee = await this.findAttendee(eventId, userId);
 
-    if (existingAttendee.role !== 'ORGANIZER') {
-      throw new Error('Only organizers can create attendees');
+    if (existingAttendee) {
+      throw new ConflictException('Attendee already exists');
     }
 
     return await this.prisma.eventAttendee.create({
       data: {
         eventId,
         userId,
-        role: role.role,
+        role: 'ATTENDEE',
       },
     });
   }
@@ -78,10 +90,18 @@ export class EventAttendeeService {
       throw new NotFoundException('User not found');
     }
 
-    const existingAttendee = await this.findAttendee(eventId, userId);
+    let existingAttendee;
+    try {
+      existingAttendee = await this.findAttendee(eventId, userId);
+    } catch (error) {
+      if (error instanceof NotFoundException) {
+        throw new NotFoundException('Attendee not found');
+      }
+      throw error;
+    }
 
     if (existingAttendee.role === 'ORGANIZER') {
-      throw new Error('Only organizers can remove attendees');
+      throw new ForbiddenException('Only organizers can remove attendees');
     }
 
     return await this.prisma.eventAttendee.delete({
@@ -93,7 +113,6 @@ export class EventAttendeeService {
       },
     });
   }
-
   async findAttendee(eventId: string, userId: string) {
     const attendee = await this.prisma.eventAttendee.findUnique({
       where: {
